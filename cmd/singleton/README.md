@@ -2,6 +2,17 @@
 Spawns a singleton process by taking a distributed lock on an Azure Blob
 
 Example usage:
+```bash
+./singleton \
+  -a storageaccount \
+  -c storagecontainername \
+  -k storageaccountkey \
+  -r 10s \
+  -q 10s \
+  -l 30s \
+  -cmd "bash" \       # full path to command to execute as singleton
+  -args "sleep.sh"    # arugments (get split on space) e.g. "--option1 value1 --option2 value2"
 ```
-./singleton -a storageaccount -c storagecontainername -k storageaccountkey -r 10s -q 10s -l 30s -cmd /path/command -args "--some arg --someOther arg"
-```
+
+Also supports environment variables instead of args e.g. `SINGLETON_ACCOUNT_NAME`
+
