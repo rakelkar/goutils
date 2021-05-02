@@ -54,6 +54,13 @@ func main() {
 	logger.Info("Terminating.")
 }
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 func parseArgs() (ParsedOptions, error) {
 
 	parsedArgs := ParsedOptions{}
@@ -62,9 +69,9 @@ func parseArgs() (ParsedOptions, error) {
 	accountName := flag.String("a", os.Getenv("SINGLETON_ACCOUNT_NAME"), "storage account name")
 	containerName := flag.String("c", os.Getenv("SINGLETON_CONTAINER_NAME"), "container name")
 	accountKey := flag.String("k", os.Getenv("SINGLETON_STORAGE_KEY"), "storage account key")
-	leaseDurationStr := flag.String("l", os.Getenv("SINGLETON_LEASE_DURATION_SECS"), "lease duration")
-	renewDurationStr := flag.String("r", os.Getenv("SINGLETON_RENEW_DURATION_SECS"), "renew duration")
-	acquireDurationStr := flag.String("q", os.Getenv("SINGLETON_ACQUIRE_DURATION_SECS"), "acquire poll duration")
+	leaseDurationStr := flag.String("l", getEnv("SINGLETON_LEASE_DURATION", "30s"), "lease duration e.g. 30s")
+	renewDurationStr := flag.String("r", getEnv("SINGLETON_RENEW_DURATION", "10s"), "renew duration")
+	acquireDurationStr := flag.String("q", getEnv("SINGLETON_ACQUIRE_DURATION", "30s"), "acquire poll duration")
 
 	// command options
 	commandPath := flag.String("cmd", os.Getenv("SINGLETON_CMD"), "command to execute as singleton")
