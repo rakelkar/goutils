@@ -1,1 +1,2 @@
-while true; do echo 'RUNNING - Hit CTRL+C'; sleep 1; done
+#!/bin/bash
+while true; do echo RUNNING arg1:$1 arg2:$2- Hit CTRL+C; sleep 1; done

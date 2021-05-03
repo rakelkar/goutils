@@ -10,8 +10,8 @@ Example usage:
   -r 10s \
   -q 10s \
   -l 30s \
-  -cmd "bash" \       # full path to command to execute as singleton
-  -args "sleep.sh"    # arugments (get split on space) e.g. "--option1 value1 --option2 value2"
+  -cmd "./sleep.sh" \       # full path to command to execute as singleton
+  -args "a b"    # arugments (get split on space) e.g. "--option1 value1 --option2 value2"
 ```
 
 Also supports environment variables instead of args e.g. `SINGLETON_ACCOUNT_NAME`
