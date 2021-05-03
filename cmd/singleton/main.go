@@ -76,6 +76,7 @@ func parseArgs() (ParsedOptions, error) {
 	// command options
 	commandPath := flag.String("cmd", os.Getenv("SINGLETON_CMD"), "command to execute as singleton")
 	commandArgsStr := flag.String("args", os.Getenv("SINGLETON_CMD_ARGS"), "commmand arguments list")
+	commandArgsSeparator := flag.String("sep", getEnv("SINGLETON_CMD_ARG_SEPARATOR", " "), "commmand arguments list separator (defaul to space)")
 
 	flag.Parse()
 
@@ -99,7 +100,7 @@ func parseArgs() (ParsedOptions, error) {
 	}
 
 	parsedArgs.CommandPath = *commandPath
-	parsedArgs.CommandArgs = strings.Split(*commandArgsStr, " ")
+	parsedArgs.CommandArgs = strings.Split(*commandArgsStr, *commandArgsSeparator)
 	parsedArgs.StorageConfig = leader.AzureStorageAccountConfiguration{
 		Name:                    *accountName,
 		ContainerName:           *containerName,
