@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/rakelkar/goutils/pkg/leader"
@@ -40,14 +41,16 @@ func main() {
 	startfunc := func() error {
 		// Start the Cmd
 		logger.Info("Starting the Cmd.")
-		spawnProcess(logger, parsedArgs.CommandPath, parsedArgs.CommandArgs)
-		close(stop)
+		spawnProcess(logger, stop, parsedArgs.CommandPath, parsedArgs.CommandArgs)
+		if _, ok := <- stop; ok {
+			close(stop)
+		}
 		return nil
 	}
 
 	mutex := leader.NewBlobDistributedMutex(logger, parsedArgs.StorageConfig)
 	if err := mutex.RunTaskWhenMutexAcquired(ctx, stop, startfunc); err != nil {
-		logger.Error(err, "unable to run the manager")
+		logger.Error(err, "unable to run singleton locker")
 		os.Exit(1)
 	}
 
@@ -70,13 +73,14 @@ func parseArgs() (ParsedOptions, error) {
 	containerName := flag.String("c", os.Getenv("SINGLETON_CONTAINER_NAME"), "container name")
 	accountKey := flag.String("k", os.Getenv("SINGLETON_STORAGE_KEY"), "storage account key")
 	leaseDurationStr := flag.String("l", getEnv("SINGLETON_LEASE_DURATION", "30s"), "lease duration e.g. 30s")
-	renewDurationStr := flag.String("r", getEnv("SINGLETON_RENEW_DURATION", "10s"), "renew duration")
-	acquireDurationStr := flag.String("q", getEnv("SINGLETON_ACQUIRE_DURATION", "30s"), "acquire poll duration")
+	renewDurationStr := flag.String("r", getEnv("SINGLETON_RENEW_DURATION", "5s"), "renew duration")
+	acquireDurationStr := flag.String("q", getEnv("SINGLETON_ACQUIRE_DURATION", "15s"), "acquire poll duration")
 
 	// command options
 	commandPath := flag.String("cmd", os.Getenv("SINGLETON_CMD"), "command to execute as singleton")
 	commandArgsStr := flag.String("args", os.Getenv("SINGLETON_CMD_ARGS"), "commmand arguments list")
 	commandArgsSeparator := flag.String("sep", getEnv("SINGLETON_CMD_ARG_SEPARATOR", " "), "commmand arguments list separator (defaul to space)")
+	isTestMode := flag.Bool("t", false, "run in test mode (no validation)")
 
 	flag.Parse()
 
@@ -95,7 +99,7 @@ func parseArgs() (ParsedOptions, error) {
 		return ParsedOptions{}, fmt.Errorf("config: invalid value %s %v", "acquireDuration", err)
 	}
 
-	if leaseDuration < renewDuration {
+	if leaseDuration < renewDuration && !(*isTestMode) {
 		return ParsedOptions{}, fmt.Errorf("config: renew duration should be less than lease duration")
 	}
 
@@ -113,17 +117,45 @@ func parseArgs() (ParsedOptions, error) {
 	return parsedArgs, nil
 }
 
-func spawnProcess(logger *zap.SugaredLogger, cmdPath string, cmdArgs []string) {
+func spawnProcess(logger *zap.SugaredLogger, stop chan struct{}, cmdPath string, cmdArgs []string) {
 	logger.Infof("Starting Cmd: [%s] with arguments [%s]", cmdPath, cmdArgs)
 	cmd := exec.Command(cmdPath, cmdArgs...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
-		logger.Fatal(err)
+	if err := cmd.Start(); err != nil {
+		logger.Fatal("Cmd failed to start with error: %v", err)
+		return
 	}
-	logger.Info("Cmd completed.")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case _, ok := <-stop:
+		if !ok {
+			logger.Warn("stop closed (process terminated?)")
+			return
+		}
+
+		logger.Info("stop triggered.")
+		if err := cmd.Process.Kill(); err != nil {
+			logger.Fatal("failed to kill process", err)
+		}
+		logger.Info("process killed on stop trigger")
+
+	case err := <-done:
+		if err != nil {
+			logger.Fatal("process finished with error", err)
+		}
+		logger.Info("process finished successfully")
+	}	
 }
+
 func idleLoop(logger *zap.SugaredLogger) int {
 	for i := 0; i < 100; i++ {
 		logger.Info("running")
