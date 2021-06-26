@@ -25,8 +25,11 @@ type ParsedOptions struct {
 
 func main() {
 	ctx := context.Background()
-	zaplog, _ := zap.NewProduction()
-	logger := zaplog.Sugar()
+	config := zap.NewProductionConfig()
+	config.OutputPaths = []string{"stdout"}
+	zapLogger, err := config.Build()
+	logger := zapLogger.Sugar()
+
 	defer logger.Sync() // flushes buffer, if any
 
 	parsedArgs, err := parseArgs()
