@@ -1,6 +1,11 @@
 # Singleton Spawner
 Spawns a singleton process by taking a distributed lock on an Azure Blob
 
+Build:
+```
+go build -v  github.com/rakelkar/goutils/cmd/singleton
+```
+
 Example usage:
 ```bash
 ./singleton \
