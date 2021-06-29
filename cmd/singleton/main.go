@@ -45,9 +45,7 @@ func main() {
 		// Start the Cmd
 		logger.Info("Starting the Cmd.")
 		spawnProcess(logger, stop, parsedArgs.CommandPath, parsedArgs.CommandArgs)
-		if _, ok := <- stop; ok {
-			close(stop)
-		}
+		logger.Info("Cmd Exited.")
 		return nil
 	}
 
@@ -138,25 +136,31 @@ func spawnProcess(logger *zap.SugaredLogger, stop chan struct{}, cmdPath string,
 		done <- cmd.Wait()
 	}()
 
-	select {
-	case _, ok := <-stop:
-		if !ok {
-			logger.Warn("stop closed (process terminated?)")
+	for true {
+
+		select {
+		case _, ok := <-stop:
+			if !ok {
+				logger.Warn("stop closed (process terminated?)")
+				return
+			}
+
+			logger.Info("stop triggered.")
+			if err := cmd.Process.Kill(); err != nil {
+				logger.Fatal("failed to kill process", err)
+			}
+			logger.Warn("process killed on stop trigger")
+
+		case err := <-done:
+			if err != nil {
+				logger.Error("process finished with error ", err)
+			} else {
+				logger.Info("process finished successfully")
+			}
+
 			return
 		}
-
-		logger.Info("stop triggered.")
-		if err := cmd.Process.Kill(); err != nil {
-			logger.Fatal("failed to kill process", err)
-		}
-		logger.Info("process killed on stop trigger")
-
-	case err := <-done:
-		if err != nil {
-			logger.Fatal("process finished with error", err)
-		}
-		logger.Info("process finished successfully")
-	}	
+	}
 }
 
 func idleLoop(logger *zap.SugaredLogger) int {
